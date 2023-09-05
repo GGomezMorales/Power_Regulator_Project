@@ -1,122 +1,67 @@
-// Import required libraries
-#include <Arduino.h>
 #include <WiFi.h>
-#include <AsyncTCP.h>
-#include <ESPAsyncWebServer.h>
+#include <PubSubClient.h>
 
-// Replace with your network credentials
-const char* ssid = "Name";
-const char* password = "noquiero";
+const char *ssid = "name";
+const char *password = "noquiero";
+const char *mqttServer = "broker.emqx.io";
+const int mqttPort = 1883;
+const char *mqttUser = "namex";
+const char *mqttPassword = "noquierox";
 
-// const char* ssid = "Coworking-Rosales";
-// const char* password = "MoniPepe_4327";
+const int ledPin = 16;
 
-const int output = 16;
+WiFiClient espClient;
+PubSubClient client(espClient);
 
-String sliderValue = "0";
-int sliderValue2 = 0;
-
-// setting PWM properties
-const int freq = 5000;
-const int ledChannel = 0;
-const int resolution = 8;
-
-const char* PARAM_INPUT = "value";
-
-// Create AsyncWebSgiterver object on port 80
-AsyncWebServer server(80);
-
-const char index_html[] PROGMEM = R"rawliteral(
-<!DOCTYPE HTML><html>
-<head>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ESP Web Server</title>
-  <style>
-    html {font-family: Arial; display: inline-block; text-align: center;}
-    h2 {font-size: 2.3rem;}
-    p {font-size: 1.9rem;}
-    body {max-width: 400px; margin:0px auto; padding-bottom: 25px;}
-    .slider { -webkit-appearance: none; margin: 14px; width: 360px; height: 25px; background: #FFD65C;
-      outline: none; -webkit-transition: .2s; transition: opacity .2s;}
-    .slider::-webkit-slider-thumb {-webkit-appearance: none; appearance: none; width: 35px; height: 35px; background: #003249; cursor: pointer;}
-    .slider::-moz-range-thumb { width: 35px; height: 35px; background: #003249; cursor: pointer; } 
-  </style>
-</head>
-<body>
-  <h2>ESP Web Server</h2>
-  <p><span id="textSliderValue">%SLIDERVALUE%</span></p>
-  <p><input type="range" onchange="updateSliderPWM(this)" id="pwmSlider" min="0" max="100" value="%SLIDERVALUE%" step="1" class="slider"></p>
-<script>
-function updateSliderPWM(element) {
-  var sliderValue = document.getElementById("pwmSlider").value;
-  document.getElementById("textSliderValue").innerHTML = sliderValue;
-  console.log(sliderValue);
-  var xhr = new XMLHttpRequest();
-  xhr.open("GET", "/slider?value="+sliderValue, true);
-  xhr.send();
-}
-</script>
-</body>
-</html>
-)rawliteral";
-
-// Replaces placeholder with button section in your web page
-String processor(const String& var){
-  //Serial.println(var);
-  if (var == "SLIDERVALUE"){
-    return sliderValue;
-  }
-  return String();
-}
-
-void setup(){
-  // Serial port for debugging purposes
+void setup()
+{
   Serial.begin(115200);
-  // int sliderValue2 = 0;
-  // configure LED PWM functionalitites
-  ledcSetup(ledChannel, freq, resolution);
-  
-  sliderValue2 = map(sliderValue.toInt(), 0, 100, 0, 255);
-  // attach the channel to the GPIO to be controlled
-  ledcAttachPin(output, ledChannel);
+  pinMode(ledPin, OUTPUT);
 
-  ledcWrite(ledChannel, sliderValue2);
-
-  // Connect to Wi-Fi
   WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
+  while (WiFi.status() != WL_CONNECTED)
+  {
     delay(1000);
-    Serial.println("Connecting to WiFi..");
+    Serial.println("Conectando a WiFi...");
   }
+  Serial.println("Conectado a la red WiFi");
 
-  // Print ESP Local IP Address
-  Serial.println(WiFi.localIP());
+  client.setServer(mqttServer, mqttPort);
+  client.setCallback(callback);
 
-  // Route for root / web page
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
-    request->send_P(200, "text/html", index_html, processor);
-  });
-
-  // Send a GET request to <ESP_IP>/slider?value=<inputMessage>
-  server.on("/slider", HTTP_GET, [] (AsyncWebServerRequest *request) {
-    String inputMessage;
-    // GET input1 value on <ESP_IP>/slider?value=<inputMessage>
-    if (request->hasParam(PARAM_INPUT)) {
-      inputMessage = request->getParam(PARAM_INPUT)->value();
-      sliderValue = inputMessage;
-      ledcWrite(ledChannel, sliderValue.toInt());
+  while (!client.connected())
+  {
+    Serial.println("Conectando al broker MQTT...");
+    if (client.connect("ESP32Client", mqttUser, mqttPassword))
+    {
+      Serial.println("Conectado al broker MQTT");
+      client.subscribe("led/control");
     }
-    else {
-      inputMessage = "No message sent";
+    else
+    {
+      Serial.print("Fallo al conectar al broker MQTT. Estado: ");
+      Serial.print(client.state());
+      delay(2000);
     }
-    Serial.println(inputMessage);
-    request->send(200, "text/plain", "OK");
-  });
-  
-  // Start server
-  server.begin();
+  }
 }
-  
-void loop() {
-  
+
+void callback(char *topic, byte *payload, unsigned int length)
+{
+  Serial.print("Mensaje recibido en el topic: ");
+  Serial.println(topic);
+
+  if ((char)payload[0] == '1')
+  {
+    digitalWrite(ledPin, HIGH); // Enciende el LED
+  }
+  else if ((char)payload[0] == '0')
+  {
+    digitalWrite(ledPin, LOW); // Apaga el LED
+  }
+}
+
+void loop()
+{
+  client.loop();
 }
