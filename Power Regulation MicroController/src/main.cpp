@@ -1,20 +1,22 @@
 #include <Arduino.h>
 
+// Pinout ESP32 Wemos Lolin32: GPIO 16, 34, 35
 const byte gateTriacPin = 16;
 const byte zeroCrossingPin = 34;
-const byte anglePin = 35;
-const int delayTime = 0;
-volatile int angle = 0;
+const byte anglePin = 35; // This pin will later be replaced by an angle sent from the app.
+
+// Variables
+int delayTime = 0;      // Delay time in microseconds between the zero crossing and the gate signal.
+volatile int angle = 0; // Angle of the potentiometer (0° - 180°)
 volatile bool zeroCrossed = false;
-int counter = 0;
+
 unsigned long lastZeroCrossingTime = 0;
-const unsigned long debounceDelay = 100; // Adjust this value as needed
+const unsigned long debounceDelay = 5;
 
 void zeroCrossing()
 {
   unsigned long currentMillis = millis();
 
-  // Check if enough time has passed since the last zero-crossing event
   if (currentMillis - lastZeroCrossingTime >= debounceDelay)
   {
     Serial.println(currentMillis - lastZeroCrossingTime);
@@ -23,12 +25,26 @@ void zeroCrossing()
   }
 }
 
+void showData()
+{
+  Serial.print("Angle: ");
+  Serial.println(angle);
+
+  Serial.print("Zero Crossing: ");
+  Serial.println(zeroCrossed);
+
+  Serial.print("Delay Time: ");
+  Serial.println(delayTime);
+
+  Serial.println(" ");
+}
+
 void setup()
 {
   Serial.begin(115200);
   pinMode(gateTriacPin, OUTPUT);
   pinMode(zeroCrossingPin, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(zeroCrossingPin), zeroCrossing, RISING);
+  attachInterrupt(digitalPinToInterrupt(zeroCrossingPin), zeroCrossing, FALLING);
 }
 
 void loop()
@@ -41,50 +57,11 @@ void loop()
     int delayTime = map(angle, 0, 180, 0, 8333);
     delayMicroseconds(delayTime);
     digitalWrite(gateTriacPin, HIGH);
-    counter++;
-
-    Serial.println("Datos dentro del if");
-
-    Serial.print("Counter: ");
-    Serial.println(counter);
-
-    Serial.print("Angle: ");
-    Serial.println(angle);
-
-    Serial.print("Potenciometer: ");
-    Serial.println(angleValue);
-
-    Serial.print("Zero Crossing: ");
-    Serial.println(zeroCrossed);
-
-    Serial.print("Delay Time: ");
-    Serial.println(delayTime);
-
-    Serial.println(" ");
-
     delayMicroseconds(2000000);
     digitalWrite(gateTriacPin, LOW);
     zeroCrossed = false;
   }
-
-  Serial.println("Datos fuera del if");
-
-  Serial.print("Counter: ");
-  Serial.println(counter);
-
-  Serial.print("Angle: ");
-  Serial.println(angle);
-
-  Serial.print("Potenciometer: ");
-  Serial.println(angleValue);
-
-  Serial.print("Zero Crossing: ");
-  Serial.println(zeroCrossed);
-
-  Serial.print("Delay Time: ");
-  Serial.println(delayTime);
-
-  Serial.println(" ");
-
-  delay(500);
+  
+  // showData();
+  // delay(500);
 }
