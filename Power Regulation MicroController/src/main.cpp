@@ -9,34 +9,11 @@ const byte anglePin = 35; // This pin will later be replaced by an angle sent fr
 int delayTime = 0;      // Delay time in microseconds between the zero crossing and the gate signal.
 volatile int angle = 0; // Angle of the potentiometer (0° - 180°)
 volatile bool zeroCrossed = false;
-
-unsigned long lastZeroCrossingTime = 0;
-const unsigned long debounceDelay = 5;
+volatile int counter = 0;
 
 void zeroCrossing()
 {
-  unsigned long currentMillis = millis();
-
-  if (currentMillis - lastZeroCrossingTime >= debounceDelay)
-  {
-    Serial.println(currentMillis - lastZeroCrossingTime);
-    zeroCrossed = true;
-    lastZeroCrossingTime = currentMillis;
-  }
-}
-
-void showData()
-{
-  Serial.print("Angle: ");
-  Serial.println(angle);
-
-  Serial.print("Zero Crossing: ");
-  Serial.println(zeroCrossed);
-
-  Serial.print("Delay Time: ");
-  Serial.println(delayTime);
-
-  Serial.println(" ");
+  zeroCrossed = true;
 }
 
 void setup()
@@ -57,11 +34,15 @@ void loop()
     int delayTime = map(angle, 0, 180, 0, 8333);
     delayMicroseconds(delayTime);
     digitalWrite(gateTriacPin, HIGH);
-    delayMicroseconds(2000000);
+    delayMicroseconds(50);
     digitalWrite(gateTriacPin, LOW);
+    counter++;
     zeroCrossed = false;
   }
-  
-  // showData();
-  // delay(500);
+
+  Serial.print("Counter: ");
+  Serial.println(counter);
+  Serial.print("Angle: ");
+  Serial.println(angle);
+  delay(50);
 }
