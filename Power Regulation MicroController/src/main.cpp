@@ -2,8 +2,8 @@
 #include <WiFi.h>
 #include <WebSocketsServer.h>
 
-const char *ssid = "rwork";
-const char *password = "MoniP3P3";
+const char *ssid = "HUAWEI nova 5T";
+const char *password = "Eyleen0129";
 
 const int webSocketPort = 81;
 WebSocketsServer webSocket = WebSocketsServer(webSocketPort);
@@ -33,7 +33,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
     case WStype_TEXT:
       Serial.printf("[%u] Recibido: %s\n", num, payload);
       angle = atoi((char *)payload); 
-      angle = constrain(angle, 0, 180);
+      angle = constrain(angle, 12, 156);
       break;
   }
 }
