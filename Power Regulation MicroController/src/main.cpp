@@ -2,37 +2,41 @@
 #include <WiFi.h>
 #include <WebSocketsServer.h>
 
-const char *ssid = "HUAWEI nova 5T";
-const char *password = "Eyleen0129";
+const char *ssid = "HOME RD-SOMOS_2.4g";
+const char *password = "F10773929";
 
 const int webSocketPort = 81;
 WebSocketsServer webSocket = WebSocketsServer(webSocketPort);
 
 const byte gateTriacPin = 16;
 const byte zeroCrossingPin = 34;
+const int sensorPin = A0;  // Assuming the sensor is connected to pin A0
+const int numSamples = 10;
+float readings[numSamples];
+int readIndex = 0;
 
 int angle = 90;
 unsigned long delayTime = 0;
 volatile bool zeroCrossed = false;
 
-void handleZeroCrossing()
-{
+void handleZeroCrossing() {
   zeroCrossed = true;
 }
 
 void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length) {
+  Serial.printf("Event: %d\n", type);
   switch (type) {
     case WStype_DISCONNECTED:
-      Serial.printf("[%u] Desconectado!\n", num);
+      Serial.printf("[%u] Disconnected!\n", num);
       break;
     case WStype_CONNECTED: {
       IPAddress ip = webSocket.remoteIP(num);
-      Serial.printf("[%u] Conectado desde %d.%d.%d.%d\n", num, ip[0], ip[1], ip[2], ip[3]);
+      Serial.printf("[%u] Connected from %d.%d.%d.%d\n", num, ip[0], ip[1], ip[2], ip[3]);
+      break;
     }
-    break;
     case WStype_TEXT:
-      Serial.printf("[%u] Recibido: %s\n", num, payload);
-      angle = atoi((char *)payload); 
+      Serial.printf("[%u] Received: %s\n", num, payload);
+      angle = atoi((char *)payload);
       angle = constrain(angle, 12, 156);
       break;
   }
@@ -43,11 +47,10 @@ void setup() {
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
     delay(1000);
-    Serial.println("Conectando a la red WiFi...");
+    Serial.println("Connecting to WiFi...");
   }
 
-  // Muestra la dirección IP de la ESP32 en el monitor serie
-  Serial.print("Dirección IP de la ESP32: ");
+  Serial.print("ESP32 IP Address: ");
   Serial.println(WiFi.localIP());
 
   webSocket.begin();
@@ -55,21 +58,42 @@ void setup() {
 
   pinMode(gateTriacPin, OUTPUT);
   pinMode(zeroCrossingPin, INPUT_PULLDOWN);
+  pinMode(sensorPin, INPUT);
   attachInterrupt(digitalPinToInterrupt(zeroCrossingPin), handleZeroCrossing, RISING);
 
-  Serial.println("Servidor WebSocket iniciado");
+  Serial.println("WebSocket server started");
+}
+
+float readVoltage() {
+  int analogValue = analogRead(sensorPin);
+  return (analogValue * 3.3) / 4095.0; // Convert analog value to voltage
+}
+
+float filterVoltage(float newReading) {
+  readings[readIndex] = newReading;
+  readIndex = (readIndex + 1) % numSamples;
+
+  float sum = 0.0;
+  for (int i = 0; i < numSamples; i++) {
+    sum += readings[i];
+  }
+  return sum / numSamples; // Return the average of readings
 }
 
 void loop() {
+  webSocket.loop();
   if (zeroCrossed) {
+    zeroCrossed = false;
     delayMicroseconds(50);
     delayTime = map(angle, 0, 180, 8333, 0);
     delayMicroseconds(delayTime);
     digitalWrite(gateTriacPin, HIGH);
-    delayMicroseconds(100); // Duración del pulso de encendido (ajústalo según tus necesidades).
+    delayMicroseconds(100);
     digitalWrite(gateTriacPin, LOW);
-    zeroCrossed = false;
   }
 
-  webSocket.loop();
+  float voltage = readVoltage();
+  float filteredVoltage = filterVoltage(voltage);
+  String voltageString = String(filteredVoltage, 3); // Convert filtered voltage to string with 3 decimal places
+  webSocket.broadcastTXT(voltageString.c_str()); // Broadcast the voltage string to all connected clients
 }
